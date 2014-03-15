@@ -16,7 +16,9 @@
         "consolidate": "^0.10.0",
         "underscore": "^1.6.0",
         "express-namespace": "^0.1.1",
-        "mongoose": "^3.8.8"
+        "mongoose": "^3.8.8",
+        "yahoo-finance": "^0.1.0",
+        "moment": "^2.5.1"
     },
     "devDependencies": {
         "grunt": "^0.4.4",
