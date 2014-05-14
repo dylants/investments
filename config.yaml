@@ -1,0 +1,13 @@
+---
+# Server Configuration
+server:
+    host:   "0.0.0.0"
+    port:   "8000"
+
+# Mongo Configuration
+mongo:
+    username:   ""
+    password:   ""
+    host:       "localhost"
+    port:       ""
+    database:   "investments"

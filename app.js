@@ -1,66 +1,73 @@
-require("express-namespace");
-var express = require("express"),
+"use strict";
+
+var Hapi = require("hapi"),
+    yaml = require("js-yaml"),
     fs = require("fs"),
-    cons = require("consolidate"),
-    app = express(),
     mongoose = require("mongoose");
 
-// configure the app (all environments)
-app.configure(function() {
-    // read the port from the environment, else set to 3000
-    app.set("port", process.env.PORT || 3000);
+var config,
+    mongoConnection,
+    serverOptions, serverConfiguration, server;
 
-    // configure view rendering (underscore)
-    app.engine("html", cons.underscore);
-    app.set("view engine", "html");
-    app.set("views", __dirname + "/views");
+config = yaml.safeLoad(fs.readFileSync("./config.yaml", "utf8"));
 
-    // use express' body parser to access body elements later
-    app.use(express.bodyParser());
+/*
+ * Connect to mongoDB using configuration found in the config file.
+ * This connection will be used by the mongoose API throughout
+ * our code base.
+ */
+mongoConnection = "";
 
-    // connect to mongo "investments" database
-    mongoose.connect("mongodb://localhost/investments", function(error) {
-        // handle the error case
-        if (error) {
-            console.error("Failed to connect to the Mongo server!!");
-            console.error(error);
-            throw error;
-        }
-    });
+// add username/password if supplied
+if (config.mongo.username && config.mongo.password) {
+    mongoConnection = config.mongo.username + ":" + config.mongo.password + "@";
+}
 
-    // bring in all models into scope (these use mongoose)
-    fs.readdirSync("models").forEach(function(modelName) {
-        require("./models/" + modelName);
-    });
+// add the host
+mongoConnection = mongoConnection + config.mongo.host;
 
-    // pull in all the controllers (these contain routes)
-    fs.readdirSync("controllers").forEach(function(controllerName) {
-        require("./controllers/" + controllerName)(app);
-    });
+// add the port if supplied
+if (config.mongo.port) {
+    mongoConnection = mongoConnection + ":" + config.mongo.port;
+}
 
-    // lock the router to process routes up to this point
-    app.use(app.router);
+// add the database
+mongoConnection = mongoConnection + "/" + config.mongo.database;
 
-    // static assets processed after routes, mapped to /public
-    app.use("/public", express.static(__dirname + "/public"));
+// connect to the database
+mongoose.connect("mongodb://" + mongoConnection, function(error) {
+    // handle the error case
+    if (error) {
+        console.error("Failed to connect to the Mongo server!!");
+        console.error(error);
+        throw error;
+    }
 });
 
-// configuration for development environment
-app.configure("development", function() {
-    console.log("in development environment");
-    app.use(express.errorHandler());
+// bring in all models into scope (these use mongoose)
+fs.readdirSync("models").forEach(function(modelName) {
+    require("./models/" + modelName);
 });
 
-// configuration for production environment (NODE_ENV=production)
-app.configure("production", function() {
-    console.log("in production environment");
-    // configure a generic 500 error message
-    app.use(function(err, req, res, next) {
-        res.send(500, "An error has occurred");
-    });
-});
+// hapi server options
+serverOptions = {
+    host: process.env.HOST || config.server.host,
+    port: process.env.PORT || config.server.port
+};
 
-// start the app
-app.listen(app.get("port"), function() {
-    console.log("Express server listening on port " + app.get("port"));
+// hapi server configuration options
+serverConfiguration = {
+    cors: true,
+    security: true
+};
+
+// create the hapi server
+server = new Hapi.Server(serverOptions.host, serverOptions.port, serverConfiguration);
+
+// include the routes
+server.route(require("./routes").endpoints);
+
+// start the server
+server.start(function() {
+    console.log("Server started at: " + server.info.uri);
 });
